@@ -553,7 +553,12 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
                 Vector3 normal = normals[elementIndeices[2] - 1];
 
                 // 位置の反転&法線の反転&左下原点
+                position.x *= -1.0f;
                 texcoord.y = 1.0f - texcoord.y;
+                normal.x *= -1.0f;
+
+                /* VertexData vertex = { position, texcoord, normal };
+                 modelData.vertices.push_back(vertex);*/
 
                 triangle[faceVertex] = { position, texcoord, normal };
             }
@@ -1640,7 +1645,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     /// ==============================================================================================================
 
     // モデル読み込み
-    ModelData model = LoadObjFile("resources", "fence.obj");
+    ModelData model = LoadObjFile("resources", "plane.obj");
 
     // 画像読み込み
     DirectX::ScratchImage mip2 = LoadTexture(model.material.textureFilePath);
