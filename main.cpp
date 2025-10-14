@@ -114,65 +114,6 @@ struct SoundData {
     // バッフアのサイズ
     unsigned int bufferSize;
 };
-enum BlendMode {
-    kBlendModeNone, // ブレンドなし
-    kBlendModeNormal, // 通常αブレンド
-    kBlendModeAdd, // 加算
-    kBlendModeSubtract, // 減算
-    kBlendModeMultily, // 乗算
-    kBlendModeScreen, // スクリーン
-};
-
-D3D12_BLEND_DESC CreateBlendDesc(BlendMode mode)
-{
-
-    // レンダーターゲットのブレンド設定
-    D3D12_BLEND_DESC desc {};
-    desc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL; // RBGA全てのチャンネルを描画
-    desc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
-    desc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
-    desc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
-
-    switch (mode) {
-    case kBlendModeNone:
-        desc.RenderTarget[0].BlendEnable = false;
-        break;
-    case kBlendModeNormal:
-        desc.RenderTarget[0].BlendEnable = true;
-        desc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
-        desc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
-        desc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
-        break;
-    case kBlendModeAdd:
-        desc.RenderTarget[0].BlendEnable = true;
-        desc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
-        desc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
-        desc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
-        break;
-    case kBlendModeSubtract:
-        desc.RenderTarget[0].BlendEnable = true;
-        desc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
-        desc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_REV_SUBTRACT;
-        desc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
-        break;
-    case kBlendModeMultily:
-        desc.RenderTarget[0].BlendEnable = true;
-        desc.RenderTarget[0].SrcBlend = D3D12_BLEND_ZERO;
-        desc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
-        desc.RenderTarget[0].DestBlend = D3D12_BLEND_SRC_COLOR;
-        break;
-    case kBlendModeScreen:
-        desc.RenderTarget[0].BlendEnable = true;
-        desc.RenderTarget[0].SrcBlend = D3D12_BLEND_INV_DEST_COLOR;
-        desc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
-        desc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
-        break;
-    default:
-        break;
-    }
-
-    return desc;
-}
 
 Matrix4x4 MakeIdentity4x4()
 {
@@ -362,36 +303,6 @@ Microsoft::WRL::ComPtr<ID3D12Resource> CreateBufferResource(const Microsoft::WRL
     assert(SUCCEEDED(hr));
     return vertexResource;
 };
-Microsoft::WRL::ComPtr<ID3D12PipelineState> CreateGraphicsPipelineState(
-    ID3D12Device* device,
-    ID3D12RootSignature* rootSignature,
-    const D3D12_INPUT_LAYOUT_DESC& inputLayoutDesc,
-    const D3D12_RASTERIZER_DESC& rasterizerDesc,
-    const D3D12_DEPTH_STENCIL_DESC& depthStencilDesc,
-    const D3D12_SHADER_BYTECODE& vs,
-    const D3D12_SHADER_BYTECODE& ps,
-    const D3D12_BLEND_DESC& blendDesc)
-{
-    D3D12_GRAPHICS_PIPELINE_STATE_DESC desc {};
-    desc.pRootSignature = rootSignature;
-    desc.InputLayout = inputLayoutDesc;
-    desc.VS = vs;
-    desc.PS = ps;
-    desc.BlendState = blendDesc;
-    desc.RasterizerState = rasterizerDesc;
-    desc.DepthStencilState = depthStencilDesc;
-    desc.NumRenderTargets = 1;
-    desc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-    desc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
-    desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-    desc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;
-    desc.SampleDesc.Count = 1;
-
-    Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState;
-    HRESULT hr = device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pipelineState));
-    assert(SUCCEEDED(hr));
-    return pipelineState;
-}
 
 // CrashHandler
 
@@ -1191,7 +1102,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     blendDesc.RenderTarget[0].BlendEnable = true;
     blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
     blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
-    blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
+    blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
     blendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
     blendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
     blendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
@@ -1755,9 +1666,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     const char* items[] = { "Model", "Sphere" };
     static int currentItem2 = 0;
     const char* items2[] = { "NULL", "Model", "Sphere" };
-    const char* blendModeNames[] = { "None", "Normal", "Add", "Subtract", "Multiply", "Screen" };
-    static BlendMode blendMode = kBlendModeNone;
-    static BlendMode prevMode = blendMode;
 
     bool isSprite = true;
 
@@ -1777,26 +1685,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
             ImGui::Begin("Settings");
             ImGui::Combo("Select Object", &currentItem, items, IM_ARRAYSIZE(items));
             ImGui::Combo("Select Object2", &currentItem2, items2, IM_ARRAYSIZE(items2));
-
-            prevMode = blendMode;
-            ImGui::Combo("Mode", (int*)&blendMode, blendModeNames, IM_ARRAYSIZE(blendModeNames));
-
-            if (blendMode != prevMode) {
-                D3D12_BLEND_DESC blendDesc = CreateBlendDesc(blendMode);
-
-                graphicsPipelineState = CreateGraphicsPipelineState(
-                    device.Get(),
-                    rootSignature.Get(),
-                    inputLayoutDesc,
-                    rasterizerDesc,
-                    depthStencilDesc,
-                    { vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize() },
-                    { pixeShaderBlob->GetBufferPointer(), pixeShaderBlob->GetBufferSize() },
-                    blendDesc);
-
-                prevMode = blendMode;
-            }
-
             ImGui::Checkbox("isSprite", &isSprite);
 
             if (isSprite) {
