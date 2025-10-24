@@ -1770,11 +1770,43 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     directionalLightDataModel->direction = { 0.0f, -1.0f, 0.0f };
     directionalLightDataModel->intensity = 1.0f;
 
+    // ===================================================================
+    // いたポリ
+    // ===================================================================
+
+    const uint32_t kNumInstance = 10;
+    // instancing用のtransformmatrixリソースを作る
+    Microsoft::WRL::ComPtr<ID3D12Resource> instancingResource = CreateBufferResource(device, sizeof(TransformationMatrix) * kNumInstance);
+    // 　書き込む溜めのアドレス取得
+    TransformationMatrix* instancingData = nullptr;
+    instancingResource->Map(0, nullptr, reinterpret_cast<void**>(&instancingData));
+    // 単位行列を書き込んでおく
+    for (uint32_t index = 0; index < kNumInstance; ++index) {
+        instancingData[index].WVP = MakeIdentity4x4();
+        instancingData[index].world = MakeIdentity4x4();
+    }
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC instancingSrvDesc {};
+    instancingSrvDesc.Format = DXGI_FORMAT_UNKNOWN;
+    instancingSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    instancingSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+    instancingSrvDesc.Buffer.FirstElement = 0;
+    instancingSrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+    instancingSrvDesc.Buffer.NumElements = kNumInstance;
+    instancingSrvDesc.Buffer.StructureByteStride = sizeof(TransformationMatrix);
+
+    D3D12_CPU_DESCRIPTOR_HANDLE instancingSrvHandleCPU6 = GetCPUDescriptorHandle(srvDescriptorHeap.Get(), desriptorSizeSRV, 5);
+    D3D12_GPU_DESCRIPTOR_HANDLE instancingSrvHandleGPU6 = GetGPUDescriptorHandle(srvDescriptorHeap.Get(), desriptorSizeSRV, 5);
+    device->CreateShaderResourceView(instancingResource.Get(), &instancingSrvDesc, instancingSrvHandleCPU6);
+
+    Transform
+
     /// ============================================================================================================
     /// 音声データ
     /// ============================================================================================================
 
-    Microsoft::WRL::ComPtr<IXAudio2> xAudio2;
+    Microsoft::WRL::ComPtr<IXAudio2>
+        xAudio2;
     IXAudio2MasteringVoice* masterVoice;
 
     // xAudioエンジンインスタンスを生成
