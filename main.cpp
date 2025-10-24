@@ -1108,6 +1108,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     D3D12_ROOT_SIGNATURE_DESC descriptionRootSignature {};
     descriptionRootSignature.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 
+    // Particle用RootSignature作成
+    D3D12_ROOT_SIGNATURE_DESC ParticledescriptionRootSignature {};
+    ParticledescriptionRootSignature.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+
     D3D12_DESCRIPTOR_RANGE descriptorRange[1] = {};
     descriptorRange[0].BaseShaderRegister = 0;
     descriptorRange[0].NumDescriptors = 1;
@@ -1119,16 +1123,25 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
     rootParameters[0].Descriptor.ShaderRegister = 0;
+
     rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
     rootParameters[1].Descriptor.ShaderRegister = 0;
+
     rootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
     rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
     rootParameters[2].DescriptorTable.pDescriptorRanges = descriptorRange;
     rootParameters[2].DescriptorTable.NumDescriptorRanges = _countof(descriptorRange);
+
     rootParameters[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
     rootParameters[3].Descriptor.ShaderRegister = 1;
+
+    D3D12_DESCRIPTOR_RANGE descriptorRangeForInstancing[1] = {};
+    descriptorRangeForInstancing[0].BaseShaderRegister = 0;
+    descriptorRangeForInstancing[0].NumDescriptors = 1;
+    descriptorRangeForInstancing[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    descriptorRangeForInstancing[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
     D3D12_STATIC_SAMPLER_DESC staticSamplers[1] = {};
     staticSamplers[0].Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
@@ -1144,6 +1157,41 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
     descriptionRootSignature.pParameters = rootParameters;
     descriptionRootSignature.NumParameters = _countof(rootParameters);
+
+    // Particle用RootParameter作成
+    D3D12_ROOT_PARAMETER ParticlerootParameters[4] = {};
+    ParticlerootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    ParticlerootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    ParticlerootParameters[0].Descriptor.ShaderRegister = 0;
+
+    ParticlerootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    ParticlerootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+    ParticlerootParameters[1].DescriptorTable.pDescriptorRanges = descriptorRangeForInstancing;
+    ParticlerootParameters[1].DescriptorTable.NumDescriptorRanges = _countof(descriptorRangeForInstancing);
+
+    ParticlerootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    ParticlerootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    ParticlerootParameters[2].DescriptorTable.pDescriptorRanges = descriptorRange;
+    ParticlerootParameters[2].DescriptorTable.NumDescriptorRanges = _countof(descriptorRange);
+
+    ParticlerootParameters[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    ParticlerootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    ParticlerootParameters[3].Descriptor.ShaderRegister = 1;
+
+    D3D12_STATIC_SAMPLER_DESC ParticlestaticSamplers[1] = {};
+    ParticlestaticSamplers[0].Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+    ParticlestaticSamplers[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    ParticlestaticSamplers[0].AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    ParticlestaticSamplers[0].AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    ParticlestaticSamplers[0].ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+    ParticlestaticSamplers[0].MaxLOD = D3D12_FLOAT32_MAX;
+    ParticlestaticSamplers[0].ShaderRegister = 0;
+    ParticlestaticSamplers[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    ParticledescriptionRootSignature.pStaticSamplers = ParticlestaticSamplers;
+    ParticledescriptionRootSignature.NumStaticSamplers = _countof(ParticlestaticSamplers);
+
+    ParticledescriptionRootSignature.pParameters = rootParameters;
+    ParticledescriptionRootSignature.NumParameters = _countof(rootParameters);
 
     // シリアスライズしてバイナリにする
     Microsoft::WRL::ComPtr<ID3DBlob> signatureBlob = nullptr;
@@ -1202,7 +1250,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob = CompileShader(L"Object3d.VS.hlsl", L"vs_6_0", dxcUtils, dxcCompiler, includeHandler, logStream);
     assert(vertexShaderBlob != nullptr);
 
-    Microsoft::WRL::ComPtr<IDxcBlob> pixeShaderBlob = CompileShader(L"Object3d.PS.hlsl", L"ps_6_0", dxcUtils, dxcCompiler, includeHandler, logStream);
+    Microsoft::WRL::ComPtr<IDxcBlob> pixeShaderBlob = CompileShader(L"Particle.PS.hlsl", L"ps_6_0", dxcUtils, dxcCompiler, includeHandler, logStream);
     assert(pixeShaderBlob != nullptr);
 
     D3D12_GRAPHICS_PIPELINE_STATE_DESC graphicsPipelineStateDesc {};
