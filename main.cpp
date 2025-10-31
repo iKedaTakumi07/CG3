@@ -1785,6 +1785,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     instancingvertexBufferView.SizeInBytes = UINT(sizeof(VertexData) * model.vertices.size()); // 使用するリソースのサイズ
     instancingvertexBufferView.StrideInBytes = sizeof(VertexData); // 1頂点当たりのサイズ
 
+    VertexData* instancingVertexData = nullptr;
+    instancingvertexResource->Map(0, nullptr, reinterpret_cast<void**>(&instancingVertexData));
+    instancingVertexData[0] = { { 1.0f, 1.0f, 0.0f, 1.0f }, { 0.0f, 0.0f }, { 0.0f, 0.0f, 1.0f } };
+    instancingVertexData[1] = { { -1.0f, 1.0f, 0.0f, 1.0f }, { 1.0f, 0.0f }, { 0.0f, 0.0f, 1.0f } };
+    instancingVertexData[2] = { { 1.0f, -1.0f, 0.0f, 1.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f } };
+    instancingVertexData[3] = { { 1.0f, -1.0f, 0.0f, 1.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f } };
+    instancingVertexData[4] = { { -1.0f, 1.0f, 0.0f, 1.0f }, { 1.0f, 0.0f }, { 0.0f, 0.0f, 1.0f } };
+    instancingVertexData[5] = { { -1.0f, -1.0f, 0.0f, 1.0f }, { 1.0f, 1.0f }, { 0.0f, 0.0f, 1.0f } };
+
     /// ============================================================================================================
     /// 音声データ
     /// ============================================================================================================
@@ -1859,6 +1868,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
                 ImGui::ColorEdit4("Color##ModelLight", &(directionalLightDataModel->color).x);
             }
 
+            ImGui::DragFloat3("cameratransform##", &cameratransform.translate.x, 0.01f);
+         
             ImGui::End();
 
             // update/更新処理
