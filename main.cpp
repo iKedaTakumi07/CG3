@@ -1814,8 +1814,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     static BlendMode blendMode = kBlendModeNone;
     static BlendMode prevMode = blendMode;
 
-    bool isSprite = true;
-
     MSG msg {};
     // ウィンドウの×ボタンが押されるまでループ
     while (msg.message != WM_QUIT) {
@@ -1850,19 +1848,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
                 prevMode = blendMode;
             }
 
-            ImGui::Checkbox("isSprite", &isSprite);
-
-            if (isSprite) {
-                if (ImGui::CollapsingHeader("Sprite")) {
-                    ImGui::DragFloat3("Translate##Sprite", &transformSprite.translate.x, 0.1f);
-                    ImGui::DragFloat3("Rotate##Sprite", &transformSprite.rotate.x, 0.01f);
-                    ImGui::DragFloat3("Scale##Sprite", &transformSprite.scale.x, 0.01f);
-                    ImGui::DragFloat2("UVTranslate##Sprite", &uvTransformSprite.translate.x, 0.01f, -10.0f, 10.0f);
-                    ImGui::DragFloat2("UVscale##Sprite", &uvTransformSprite.scale.x, 0.01f, -10.0f, 10.0f);
-                    ImGui::SliderAngle("UVRotate##Sprite", &uvTransformSprite.rotate.z);
-                }
-            }
-
             if (ImGui::CollapsingHeader("Model##Model")) {
                 ImGui::DragFloat3("Translate##Model", &transformModel.translate.x, 0.01f);
                 ImGui::SliderAngle("RotateX##Model", &transformModel.rotate.x);
@@ -1881,31 +1866,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
             // imguiのUI
             /* ImGui::ShowDemoWindow();*/
 
-            Matrix4x4 worldMatrix = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
             Matrix4x4 cameraMatrix = MakeAffineMatrix(cameratransform.scale, cameratransform.rotate, cameratransform.translate);
             Matrix4x4 viewMatrix = Inverse(cameraMatrix);
-            Matrix4x4 projectonMatrix = MakePrespectiveFovMatrix(0.45f, float(kWindowWidth) / float(kWindowHeight), 0.1f, 100.0f);
-            // WVPを作る
-            Matrix4x4 worldViewProjectionMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectonMatrix));
-            transformationMatrixData->WVP = worldViewProjectionMatrix;
-            transformationMatrixData->world = worldMatrix;
-
-            directionalLightData->direction = Normalize(directionalLightData->direction);
-
-            // sprite用
-            Matrix4x4 worldMatrixSprite = MakeAffineMatrix(transformSprite.scale, transformSprite.rotate, transformSprite.translate);
-            Matrix4x4 viewMatrixSprite = MakeIdentity4x4();
-            Matrix4x4 projectionMatrixSprite = MakeOrthographicMatrix(0.0f, 0.0f, float(KClientWidth), float(kWindowHeight), 0.0f, 100.0f);
-            Matrix4x4 worldViewProjectionMatrixSprite = Multiply(worldMatrixSprite, Multiply(viewMatrixSprite, projectionMatrixSprite));
-            transformationMatrixDataSprite->WVP = worldViewProjectionMatrixSprite;
-            transformationMatrixDataSprite->world = worldMatrixSprite;
-
-            Matrix4x4 uvTransformMatrix = MakeScaleMatrix(uvTransformSprite.scale);
-            uvTransformMatrix = Multiply(uvTransformMatrix, MakeRotateZMatrix(uvTransformSprite.rotate.z));
-            uvTransformMatrix = Multiply(uvTransformMatrix, MakeTranslateMatrix(uvTransformSprite.translate));
-            materialDataSprite->uvTransform = uvTransformMatrix;
-
-            directionalLightDataSprite->direction = Normalize(directionalLightDataSprite->direction);
 
             // モデルデータ
 
@@ -1964,43 +1926,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
             commandList->SetGraphicsRootSignature(rootSignature.Get());
             commandList->SetPipelineState(graphicsPipelineState.Get());
 
-            //
-            // 三角形
-            //
-
-            commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
             // 形状を設定
             commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-            // マテリアルCBuffrtの場所を設定
-            commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
-            // wvp用のCBufferの場所を設定
-            commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
-            commandList->SetGraphicsRootConstantBufferView(3, directionalLightMatrixResource->GetGPUVirtualAddress());
-            // SRV
-            commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
-            // 描画
-            // commandList->DrawInstanced(6, 1, 0, 0);
-
-            //
-            // スフィア/球
-            //
-
-            //
-            // 2d/スプライト
-            //
-            if (isSprite) {
-                commandList->SetGraphicsRootConstantBufferView(0, materialResourceSprite->GetGPUVirtualAddress());
-                commandList->SetGraphicsRootConstantBufferView(3, directionalLightMatrixResourceSprite->GetGPUVirtualAddress());
-                commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
-                // Spriteの描画
-                commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
-                // transformationMatrixCBufferの場所を設置
-                commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
-                commandList->IASetIndexBuffer(&indexBufferViewSprite);
-
-                // 描画
-                commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
-            }
 
             //
             // モデルデータ
