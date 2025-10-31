@@ -1941,7 +1941,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
             commandList->IASetIndexBuffer(&indexBufferViewModel);
 
-            commandList->DrawInstanced(UINT(model.vertices.size()), 1, 0, 0);
+            /*commandList->DrawInstanced(UINT(model.vertices.size()), 1, 0, 0);*/
 
             // 板ポリ
             commandList->SetGraphicsRootSignature(ParticlerootSignature.Get());
