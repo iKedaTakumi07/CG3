@@ -129,8 +129,8 @@ D3D12_BLEND_DESC CreateBlendDesc(BlendMode mode)
     // レンダーターゲットのブレンド設定
     D3D12_BLEND_DESC desc {};
     desc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL; // RBGA全てのチャンネルを描画
-    desc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
     desc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+    desc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
     desc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
 
     switch (mode) {
@@ -1195,7 +1195,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     blendDesc.RenderTarget[0].BlendEnable = true;
     blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
     blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
-    blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
+    blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
     blendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
     blendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
     blendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
@@ -1475,7 +1475,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
     // Transform変数を作る
     Transform transform { { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f } };
-    Transform cameratransform { { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, -10.0f } };
+    Transform cameratransform { { 1.0f, 1.0f, 1.0f }, { 0.3f, 3.14f, 0.0f }, { 0.0f, 4.0f, 10.0f } };
 
     float kWindowWidth = 1280.0f;
     float kWindowHeight = 720.0f;
@@ -1960,7 +1960,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
             commandList->IASetVertexBuffers(0, 1, &instancingvertexBufferView);
 
             // 描画
-            commandList->SetGraphicsRootConstantBufferView(0, instancingResource->GetGPUVirtualAddress());
+            commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
             commandList->SetGraphicsRootDescriptorTable(1, instancingSrvHandleGPU6);
             commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU3);
             commandList->DrawInstanced(UINT(model.vertices.size()), kNumInstance, 0, 0);
