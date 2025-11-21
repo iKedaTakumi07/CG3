@@ -17,6 +17,7 @@
 #include <format>
 #include <fstream>
 #include <numbers>
+#include <random>
 #include <sstream>
 #include <string>
 #include <strsafe.h>
@@ -70,6 +71,11 @@ struct TransformationMatrix {
     Matrix4x4 WVP;
     Matrix4x4 world;
 };
+struct ParticleForGPU {
+    Matrix4x4 WVP;
+    Matrix4x4 world;
+    Vector4 color;
+};
 struct DirectionalLight {
     Vector4 color;
     Vector3 direction;
@@ -114,6 +120,11 @@ struct SoundData {
     // バッフアのサイズ
     unsigned int bufferSize;
 };
+struct Particle {
+    Transform transfomr;
+    Vector3 velocity;
+    Vector4 color;
+};
 enum BlendMode {
     kBlendModeNone, // ブレンドなし
     kBlendModeNormal, // 通常αブレンド
@@ -122,6 +133,17 @@ enum BlendMode {
     kBlendModeMultily, // 乗算
     kBlendModeScreen, // スクリーン
 };
+
+Particle MakeNewParticle(std::mt19937& randomEngine)
+{
+    std::uniform_real_distribution<float> distribution(-1.0f, 1.0f);
+    Particle particle;
+    particle.transfomr.scale = { 1.0f, 1.0f, 1.0f };
+    particle.transfomr.rotate = { 0.0f, 0.0f, 0.0f };
+    particle.transfomr.translate = { distribution(randomEngine), distribution(randomEngine), distribution(randomEngine) };
+    particle.velocity = { distribution(randomEngine), distribution(randomEngine), distribution(randomEngine) };
+    return particle;
+}
 
 D3D12_BLEND_DESC CreateBlendDesc(BlendMode mode)
 {
@@ -246,6 +268,15 @@ Matrix4x4 Multiply(const Matrix4x4& m1, const Matrix4x4& m2)
 
     return num;
 }
+Vector3 Multiply(const Vector3& m1, const float& m2)
+{
+    Vector3 num;
+    num.x = m1.x * m2;
+    num.y = m1.y * m2;
+    num.z = m1.z * m2;
+
+    return num;
+}
 Matrix4x4 Inverse(const Matrix4x4& m)
 {
     float determinant;
@@ -336,6 +367,15 @@ Matrix4x4 MakeOrthographicMatrix(float left, float top, float right, float botto
         (top + bottom) / (bottom - top),
         nearClip / (nearClip - farClip), 1 };
     return num;
+}
+
+Vector3 operator*(const Vector3& m1, const float& m2) { return Multiply(m1, m2); }
+Vector3& operator+=(Vector3& lhv, const Vector3& rhv)
+{
+    lhv.x += rhv.x;
+    lhv.y += rhv.y;
+    lhv.z += rhv.z;
+    return lhv;
 }
 
 Microsoft::WRL::ComPtr<ID3D12Resource> CreateBufferResource(const Microsoft::WRL::ComPtr<ID3D12Device>& device, size_t sizwInBytes)
@@ -1746,14 +1786,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
     const uint32_t kNumInstance = 10;
     // instancing用のtransformmatrixリソースを作る
-    Microsoft::WRL::ComPtr<ID3D12Resource> instancingResource = CreateBufferResource(device, sizeof(TransformationMatrix) * kNumInstance);
+    Microsoft::WRL::ComPtr<ID3D12Resource> instancingResource = CreateBufferResource(device, sizeof(ParticleForGPU) * kNumInstance);
     // 　書き込む溜めのアドレス取得
-    TransformationMatrix* instancingData = nullptr;
+    ParticleForGPU* instancingData = nullptr;
     instancingResource->Map(0, nullptr, reinterpret_cast<void**>(&instancingData));
     // 単位行列を書き込んでおく
     for (uint32_t index = 0; index < kNumInstance; ++index) {
         instancingData[index].WVP = MakeIdentity4x4();
         instancingData[index].world = MakeIdentity4x4();
+        instancingData[index].color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
     }
 
     D3D12_SHADER_RESOURCE_VIEW_DESC instancingSrvDesc {};
@@ -1763,18 +1804,24 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     instancingSrvDesc.Buffer.FirstElement = 0;
     instancingSrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
     instancingSrvDesc.Buffer.NumElements = kNumInstance;
-    instancingSrvDesc.Buffer.StructureByteStride = sizeof(TransformationMatrix);
+    instancingSrvDesc.Buffer.StructureByteStride = sizeof(ParticleForGPU);
 
     D3D12_CPU_DESCRIPTOR_HANDLE instancingSrvHandleCPU6 = GetCPUDescriptorHandle(srvDescriptorHeap.Get(), desriptorSizeSRV, 5);
     D3D12_GPU_DESCRIPTOR_HANDLE instancingSrvHandleGPU6 = GetGPUDescriptorHandle(srvDescriptorHeap.Get(), desriptorSizeSRV, 5);
     device->CreateShaderResourceView(instancingResource.Get(), &instancingSrvDesc, instancingSrvHandleCPU6);
 
-    Transform transforms[kNumInstance];
+    std::random_device seedGenerator;
+    std::mt19937 randomEngine(seedGenerator());
+    std::uniform_real_distribution<float> distribution(-1.0f, 1.0f);
+    std::uniform_real_distribution<float> distColor(0.0f, 1.0f);
+
+    Particle Particles[kNumInstance];
     for (uint32_t index = 0; index < kNumInstance; ++index) {
-        transforms[index].scale = { 1.0f, 1.0f, 1.0f };
-        transforms[index].rotate = { 0.0f, 0.0f, 0.0f };
-        transforms[index].translate = { index * 0.1f, index * 0.1f, index * 0.1f };
+        Particles[index] = MakeNewParticle(randomEngine);
+        Particles[index].color = { distColor(distColor), distColor(distColor), distColor(distColor) };
     }
+
+    const float kDeltaTime = 1.0f / 60.0f;
 
     // 頂点リソースを作成
     Microsoft::WRL::ComPtr<ID3D12Resource> instancingvertexResource = CreateBufferResource(device, sizeof(VertexData) * model.vertices.size());
@@ -1892,7 +1939,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
             // 板ポリ
             for (uint32_t index = 0; index < kNumInstance; ++index) {
-                Matrix4x4 worldMatrixpori = MakeAffineMatrix(transforms[index].scale, transforms[index].rotate, transforms[index].translate);
+                Particles[index].transfomr.translate += Particles[index].velocity * kDeltaTime;
+
+                Matrix4x4 worldMatrixpori = MakeAffineMatrix(Particles[index].transfomr.scale, Particles[index].transfomr.rotate, Particles[index].transfomr.translate);
                 Matrix4x4 projectionMatrixpori = MakePrespectiveFovMatrix(0.45f, float(kWindowWidth) / float(kWindowHeight), 0.1f, 100.0f);
                 Matrix4x4 worldViewProjectionMatrixpori = Multiply(worldMatrixpori, Multiply(viewMatrix, projectionMatrixpori));
 
