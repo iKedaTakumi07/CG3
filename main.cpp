@@ -135,6 +135,12 @@ enum BlendMode {
     kBlendModeMultily, // 乗算
     kBlendModeScreen, // スクリーン
 };
+struct Emitter {
+    Transform transform;
+    uint32_t count;
+    float frequency;
+    float ferquencyTime;
+};
 
 Particle MakeNewParticle(std::mt19937& randomEngine)
 {
@@ -150,6 +156,15 @@ Particle MakeNewParticle(std::mt19937& randomEngine)
     particle.lifeTime = distTime(randomEngine);
     particle.currentTime = 0;
     return particle;
+}
+
+std::list<Particle> Emit(const Emitter& emitter, std::mt19937& randomEngine)
+{
+    std::list<Particle> particles;
+    for (uint32_t count = 0; count < emitter.count; ++count) {
+        particles.push_back(MakeNewParticle(randomEngine));
+    }
+    return particles;
 }
 
 D3D12_BLEND_DESC CreateBlendDesc(BlendMode mode)
@@ -1522,7 +1537,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
     // Transform変数を作る
     Transform transform { { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f } };
-    Transform cameratransform { { 1.0f, 1.0f, 1.0f }, { std::numbers::pi_v<float> / 3.0f, std::numbers::pi_v<float>, 0.0f }, { 0.0f, 23.0f, 10.0f } };
+    Transform cameratransform { { 1.0f, 1.0f, 1.0f }, { 0.3f, 3.14f, 0.0f }, { 0.0f, 4.0f, 10.0f } };
 
     float kWindowWidth = 1280.0f;
     float kWindowHeight = 720.0f;
@@ -1821,10 +1836,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     std::mt19937 randomEngine(seedGenerator());
     std::uniform_real_distribution<float> distribution(-1.0f, 1.0f);
 
-    Particle Particles[kNumMaxInstance];
-    for (uint32_t index = 0; index < kNumMaxInstance; ++index) {
-        Particles[index] = MakeNewParticle(randomEngine);
-    }
+    std::list<Particle> Particles;
+    Particles.push_back(MakeNewParticle(randomEngine));
+    Particles.push_back(MakeNewParticle(randomEngine));
+    Particles.push_back(MakeNewParticle(randomEngine));
 
     const float kDeltaTime = 1.0f / 60.0f;
 
@@ -1846,9 +1861,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     instancingVertexData[4] = { { -1.0f, 1.0f, 0.0f, 1.0f }, { 1.0f, 0.0f }, { 0.0f, 0.0f, 1.0f } };
     instancingVertexData[5] = { { -1.0f, -1.0f, 0.0f, 1.0f }, { 1.0f, 1.0f }, { 0.0f, 0.0f, 1.0f } };
 
-    for (uint32_t index = 0; index < kNumMaxInstance; ++index) {
+    /*for (uint32_t index = 0; index < kNumMaxInstance; ++index) {
         instancingData[index].color = Particles[index].color;
-    }
+    }*/
+
+    Emitter emitter {};
+    emitter.count = 3;
 
     /// ============================================================================================================
     /// 音声データ
@@ -1898,6 +1916,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
             prevMode = blendMode;
             ImGui::Combo("Mode", (int*)&blendMode, blendModeNames, IM_ARRAYSIZE(blendModeNames));
             ImGui::Checkbox("useBillboard", &useBillboard);
+            if (ImGui::Button("add particle")) {
+                Particles.push_back(MakeNewParticle(randomEngine));
+                Particles.push_back(MakeNewParticle(randomEngine));
+                Particles.push_back(MakeNewParticle(randomEngine));
+            }
 
             if (blendMode != prevMode) {
                 D3D12_BLEND_DESC blendDesc = CreateBlendDesc(blendMode);
@@ -1956,26 +1979,30 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
             // 板ポリ
             uint32_t numInstance = 0;
-            for (uint32_t index = 0; index < kNumMaxInstance; ++index) {
-                if (Particles[index].lifeTime <= Particles[index].currentTime) {
+            for (std::list<Particle>::iterator particleIterator = Particles.begin(); particleIterator != Particles.end(); ++particleIterator) {
+                if ((*particleIterator).lifeTime <= (*particleIterator).currentTime) {
                     continue;
                 }
 
-                Matrix4x4 worldMatrixpori = MakeAffineMatrix(Particles[index].transform.scale, Particles[index].transform.rotate, Particles[index].transform.translate);
-                if (useBillboard) {
-                    worldMatrixpori = Multiply(worldMatrixpori, billboardMatrix);
-                }
-                Matrix4x4 projectionMatrixpori = MakePrespectiveFovMatrix(0.45f, float(kWindowWidth) / float(kWindowHeight), 0.1f, 100.0f);
-                Matrix4x4 worldViewProjectionMatrixpori = Multiply(worldMatrixpori, Multiply(viewMatrix, projectionMatrixpori));
+                if (numInstance < kNumMaxInstance) {
+                    Matrix4x4 worldMatrixpori = MakeAffineMatrix((*particleIterator).transform.scale, (*particleIterator).transform.rotate, (*particleIterator).transform.translate);
+                    if (useBillboard) {
+                        worldMatrixpori = Multiply(worldMatrixpori, billboardMatrix);
+                    }
+                    Matrix4x4 projectionMatrixpori = MakePrespectiveFovMatrix(0.45f, float(kWindowWidth) / float(kWindowHeight), 0.1f, 100.0f);
+                    Matrix4x4 worldViewProjectionMatrixpori = Multiply(worldMatrixpori, Multiply(viewMatrix, projectionMatrixpori));
 
-                //Particles[index].transform.translate += Particles[index].velocity * kDeltaTime;
-                //Particles[index].currentTime += kDeltaTime;
-                float alpha = 1.0f - (Particles[index].currentTime / Particles[index].lifeTime);
-                instancingData[numInstance].WVP = worldViewProjectionMatrixpori;
-                instancingData[numInstance].world = worldMatrixpori;
-                instancingData[numInstance].color = Particles[index].color;
-                instancingData[numInstance].color.w = alpha;
-                ++numInstance;
+                    (*particleIterator).transform.translate += (*particleIterator).velocity * kDeltaTime;
+                    (*particleIterator).currentTime += kDeltaTime;
+                    float alpha = 1.0f - ((*particleIterator).currentTime / (*particleIterator).lifeTime);
+                    instancingData[numInstance].WVP = worldViewProjectionMatrixpori;
+                    instancingData[numInstance].world = worldMatrixpori;
+                    instancingData[numInstance].color = (*particleIterator).color;
+                    instancingData[numInstance].color.w = alpha;
+                    ++numInstance;
+                }
+
+                ++particleIterator;
             }
 
             // draw
