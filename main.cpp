@@ -1522,7 +1522,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
     // Transform変数を作る
     Transform transform { { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f } };
-    Transform cameratransform { { 1.0f, 1.0f, 1.0f }, { 0.3f, 3.14f, 0.0f }, { 0.0f, 4.0f, 10.0f } };
+    Transform cameratransform { { 1.0f, 1.0f, 1.0f }, { std::numbers::pi_v<float> / 3.0f, std::numbers::pi_v<float>, 0.0f }, { 0.0f, 23.0f, 10.0f } };
 
     float kWindowWidth = 1280.0f;
     float kWindowHeight = 720.0f;
@@ -1878,6 +1878,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     const char* blendModeNames[] = { "None", "Normal", "Add", "Subtract", "Multiply", "Screen" };
     static BlendMode blendMode = kBlendModeNone;
     static BlendMode prevMode = blendMode;
+    bool useBillboard = false;
 
     MSG msg {};
     // ウィンドウの×ボタンが押されるまでループ
@@ -1896,6 +1897,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
             prevMode = blendMode;
             ImGui::Combo("Mode", (int*)&blendMode, blendModeNames, IM_ARRAYSIZE(blendModeNames));
+            ImGui::Checkbox("useBillboard", &useBillboard);
 
             if (blendMode != prevMode) {
                 D3D12_BLEND_DESC blendDesc = CreateBlendDesc(blendMode);
@@ -1946,6 +1948,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
             directionalLightDataModel->direction = Normalize(directionalLightDataModel->direction);
 
+            Matrix4x4 backToFrontMatrix = MakeRotateYMatrix(std::numbers::pi_v<float>);
+            Matrix4x4 billboardMatrix = Multiply(backToFrontMatrix, cameraMatrix);
+            billboardMatrix.m[3][0] = 0.0f;
+            billboardMatrix.m[3][1] = 0.0f;
+            billboardMatrix.m[3][2] = 0.0f;
+
             // 板ポリ
             uint32_t numInstance = 0;
             for (uint32_t index = 0; index < kNumMaxInstance; ++index) {
@@ -1954,11 +1962,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
                 }
 
                 Matrix4x4 worldMatrixpori = MakeAffineMatrix(Particles[index].transform.scale, Particles[index].transform.rotate, Particles[index].transform.translate);
+                if (useBillboard) {
+                    worldMatrixpori = Multiply(worldMatrixpori, billboardMatrix);
+                }
                 Matrix4x4 projectionMatrixpori = MakePrespectiveFovMatrix(0.45f, float(kWindowWidth) / float(kWindowHeight), 0.1f, 100.0f);
                 Matrix4x4 worldViewProjectionMatrixpori = Multiply(worldMatrixpori, Multiply(viewMatrix, projectionMatrixpori));
 
-                Particles[index].transform.translate += Particles[index].velocity * kDeltaTime;
-                Particles[index].currentTime += kDeltaTime;
+                //Particles[index].transform.translate += Particles[index].velocity * kDeltaTime;
+                //Particles[index].currentTime += kDeltaTime;
                 float alpha = 1.0f - (Particles[index].currentTime / Particles[index].lifeTime);
                 instancingData[numInstance].WVP = worldViewProjectionMatrixpori;
                 instancingData[numInstance].world = worldMatrixpori;
