@@ -981,7 +981,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     // ウィンドウの作成
     HWND hwnd = CreateWindow(
         wc.lpszClassName, // 利用するクラス名
-        L"CG2", // タイトルバーの文字
+        L"LE2C_05_イケダ_タクミ", // タイトルバーの文字
         WS_OVERLAPPEDWINDOW, // よく見るウィンドウスタイル
         CW_USEDEFAULT, // 座標X表示
         CW_USEDEFAULT, // 座標Y表示
