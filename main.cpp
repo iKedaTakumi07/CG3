@@ -142,7 +142,7 @@ struct Emitter {
     float ferquencyTime;
 };
 
-Particle MakeNewParticle(std::mt19937& randomEngine)
+Particle MakeNewParticle(std::mt19937& randomEngine, const Vector3& translate)
 {
     std::uniform_real_distribution<float> distribution(-1.0f, 1.0f);
     std::uniform_real_distribution<float> distColor(0.0f, 1.0f);
@@ -150,7 +150,8 @@ Particle MakeNewParticle(std::mt19937& randomEngine)
     Particle particle;
     particle.transform.scale = { 1.0f, 1.0f, 1.0f };
     particle.transform.rotate = { 0.0f, 0.0f, 0.0f };
-    particle.transform.translate = { distribution(randomEngine), distribution(randomEngine), distribution(randomEngine) };
+    Vector3 randomTranslate { distribution(randomEngine), distribution(randomEngine), distribution(randomEngine) };
+    particle.transform.translate = { translate.x + randomTranslate.x, translate.y + randomTranslate.y, translate.z + randomTranslate.z };
     particle.velocity = { distribution(randomEngine), distribution(randomEngine), distribution(randomEngine) };
     particle.color = { distColor(randomEngine), distColor(randomEngine), distColor(randomEngine), 1.0f };
     particle.lifeTime = distTime(randomEngine);
@@ -162,7 +163,7 @@ std::list<Particle> Emit(const Emitter& emitter, std::mt19937& randomEngine)
 {
     std::list<Particle> particles;
     for (uint32_t count = 0; count < emitter.count; ++count) {
-        particles.push_back(MakeNewParticle(randomEngine));
+        particles.push_back(MakeNewParticle(randomEngine,emitter.transform.translate));
     }
     return particles;
 }
@@ -1806,7 +1807,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     // いたポリ
     // ===================================================================
 
-    const uint32_t kNumMaxInstance = 10;
+    const uint32_t kNumMaxInstance = 100;
     // instancing用のtransformmatrixリソースを作る
     Microsoft::WRL::ComPtr<ID3D12Resource> instancingResource = CreateBufferResource(device, sizeof(ParticleForGPU) * kNumMaxInstance);
     // 　書き込む溜めのアドレス取得
@@ -1836,10 +1837,18 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     std::mt19937 randomEngine(seedGenerator());
     std::uniform_real_distribution<float> distribution(-1.0f, 1.0f);
 
+    Emitter emitter {};
+    emitter.count = 3;
+    emitter.frequency = 0.5f;
+    emitter.ferquencyTime = 0.0f;
+    emitter.transform.translate = { 0.0f, 0.0f, 0.0f };
+    emitter.transform.rotate = { 0.0f, 0.0f, 0.0f };
+    emitter.transform.scale = { 1.0f, 1.0f, 1.0f };
+
     std::list<Particle> Particles;
-    Particles.push_back(MakeNewParticle(randomEngine));
-    Particles.push_back(MakeNewParticle(randomEngine));
-    Particles.push_back(MakeNewParticle(randomEngine));
+    Particles.push_back(MakeNewParticle(randomEngine,emitter.transform.translate));
+    Particles.push_back(MakeNewParticle(randomEngine,emitter.transform.translate));
+    Particles.push_back(MakeNewParticle(randomEngine,emitter.transform.translate));
 
     const float kDeltaTime = 1.0f / 60.0f;
 
@@ -1864,9 +1873,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     /*for (uint32_t index = 0; index < kNumMaxInstance; ++index) {
         instancingData[index].color = Particles[index].color;
     }*/
-
-    Emitter emitter {};
-    emitter.count = 3;
 
     /// ============================================================================================================
     /// 音声データ
@@ -1913,13 +1919,19 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
             ImGui::Begin("Settings");
 
+            if (ImGui::Button("add particle")) {
+                Particles.splice(Particles.end(), Emit(emitter, randomEngine));
+            }
+
+            ImGui::DragFloat3("EmitterTranslate", &emitter.transform.translate.x, 0.01f, -100.0f, 100.0f);
+
             prevMode = blendMode;
             ImGui::Combo("Mode", (int*)&blendMode, blendModeNames, IM_ARRAYSIZE(blendModeNames));
             ImGui::Checkbox("useBillboard", &useBillboard);
             if (ImGui::Button("add particle")) {
-                Particles.push_back(MakeNewParticle(randomEngine));
-                Particles.push_back(MakeNewParticle(randomEngine));
-                Particles.push_back(MakeNewParticle(randomEngine));
+                Particles.push_back(MakeNewParticle(randomEngine,emitter.transform.translate));
+                Particles.push_back(MakeNewParticle(randomEngine,emitter.transform.translate));
+                Particles.push_back(MakeNewParticle(randomEngine,emitter.transform.translate));
             }
 
             if (blendMode != prevMode) {
@@ -1979,8 +1991,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
             // 板ポリ
             uint32_t numInstance = 0;
-            for (std::list<Particle>::iterator particleIterator = Particles.begin(); particleIterator != Particles.end(); ++particleIterator) {
+            for (std::list<Particle>::iterator particleIterator = Particles.begin(); particleIterator != Particles.end();) {
                 if ((*particleIterator).lifeTime <= (*particleIterator).currentTime) {
+                    particleIterator = Particles.erase(particleIterator);
                     continue;
                 }
 
@@ -2003,6 +2016,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
                 }
 
                 ++particleIterator;
+            }
+
+            emitter.ferquencyTime += kDeltaTime;
+            if (emitter.frequency <= emitter.ferquencyTime) {
+                Particles.splice(Particles.end(), Emit(emitter, randomEngine));
+                emitter.ferquencyTime -= emitter.frequency;
             }
 
             // draw
