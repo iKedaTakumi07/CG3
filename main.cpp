@@ -960,7 +960,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     // ウィンドウプロ―ジャ
     wc.lpfnWndProc = Windowproc;
     // ウィンドウクラス名(なんでもよし)
-    wc.lpszClassName = L"CG2WindowClass";
+    wc.lpszClassName = L"LE2C_05_イケダ_タクミ";
     // インスタンスハンドル
     wc.hInstance = GetModuleHandle(nullptr);
     // カーソル
