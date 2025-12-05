@@ -51,6 +51,10 @@ struct Vector4 {
 struct Matrix4x4 {
     float m[4][4];
 };
+struct AABB {
+    Vector3 min;
+    Vector3 max;
+};
 struct Transform {
     Vector3 scale;
     Vector3 rotate;
@@ -99,6 +103,10 @@ struct D3DResourceLeakChecker {
             debug->ReportLiveObjects(DXGI_DEBUG_D3D12, DXGI_DEBUG_RLO_ALL);
         }
     }
+};
+struct AccelerationField {
+    Vector3 acceleration;
+    AABB area;
 };
 struct ChunkHeader {
     char id[4]; // チャンク毎のID
@@ -1873,6 +1881,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     /*for (uint32_t index = 0; index < kNumMaxInstance; ++index) {
         instancingData[index].color = Particles[index].color;
     }*/
+
+    AccelerationField accelerationField;
+    accelerationField.acceleration = { 15.0f, 0.0f, 0.0f };
+    accelerationField.area.min = { -1.0f, -1.0f, -1.0f };
+    accelerationField.area.max = { 1.0f, 1.0f, 1.0f };
 
     /// ============================================================================================================
     /// 音声データ
