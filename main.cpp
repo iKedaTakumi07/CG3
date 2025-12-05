@@ -2139,7 +2139,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
             transformationMatrixDatasphere->world = worldMatrixsphere;
 
             directionalLightDatasphere->direction = Normalize(directionalLightDatasphere->direction);
-            CameraForGPUDatasphere->worldPosition = cameratransform.translate;
+            
 
             // モデルデータ
 
