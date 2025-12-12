@@ -171,7 +171,7 @@ std::list<Particle> Emit(const Emitter& emitter, std::mt19937& randomEngine)
 {
     std::list<Particle> particles;
     for (uint32_t count = 0; count < emitter.count; ++count) {
-        particles.push_back(MakeNewParticle(randomEngine,emitter.transform.translate));
+        particles.push_back(MakeNewParticle(randomEngine, emitter.transform.translate));
     }
     return particles;
 }
@@ -398,6 +398,16 @@ Matrix4x4 MakeOrthographicMatrix(float left, float top, float right, float botto
         (top + bottom) / (bottom - top),
         nearClip / (nearClip - farClip), 1 };
     return num;
+}
+
+bool IsCollision(const AABB& aabb, const Vector3& point)
+{
+    if ((aabb.min.x <= point.x && aabb.max.x >= point.x)
+        && (aabb.min.y <= point.y && aabb.max.y >= point.y)
+        && (aabb.min.z <= point.z && aabb.max.z >= point.z)) {
+        return true;
+    }
+    return false;
 }
 
 Vector3 operator*(const Vector3& m1, const float& m2) { return Multiply(m1, m2); }
@@ -1854,9 +1864,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     emitter.transform.scale = { 1.0f, 1.0f, 1.0f };
 
     std::list<Particle> Particles;
-    Particles.push_back(MakeNewParticle(randomEngine,emitter.transform.translate));
-    Particles.push_back(MakeNewParticle(randomEngine,emitter.transform.translate));
-    Particles.push_back(MakeNewParticle(randomEngine,emitter.transform.translate));
+    Particles.push_back(MakeNewParticle(randomEngine, emitter.transform.translate));
+    Particles.push_back(MakeNewParticle(randomEngine, emitter.transform.translate));
+    Particles.push_back(MakeNewParticle(randomEngine, emitter.transform.translate));
 
     const float kDeltaTime = 1.0f / 60.0f;
 
@@ -1942,9 +1952,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
             ImGui::Combo("Mode", (int*)&blendMode, blendModeNames, IM_ARRAYSIZE(blendModeNames));
             ImGui::Checkbox("useBillboard", &useBillboard);
             if (ImGui::Button("add particle")) {
-                Particles.push_back(MakeNewParticle(randomEngine,emitter.transform.translate));
-                Particles.push_back(MakeNewParticle(randomEngine,emitter.transform.translate));
-                Particles.push_back(MakeNewParticle(randomEngine,emitter.transform.translate));
+                Particles.push_back(MakeNewParticle(randomEngine, emitter.transform.translate));
+                Particles.push_back(MakeNewParticle(randomEngine, emitter.transform.translate));
+                Particles.push_back(MakeNewParticle(randomEngine, emitter.transform.translate));
             }
 
             if (blendMode != prevMode) {
@@ -2009,6 +2019,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
                     particleIterator = Particles.erase(particleIterator);
                     continue;
                 }
+
+                if (IsCollision(accelerationField.area, (*particleIterator).transform.translate)) {
+                    (*particleIterator).velocity += accelerationField.acceleration * kDeltaTime;
+                }
+
+                (*particleIterator).transform.translate += (*particleIterator).velocity * kDeltaTime;
 
                 if (numInstance < kNumMaxInstance) {
                     Matrix4x4 worldMatrixpori = MakeAffineMatrix((*particleIterator).transform.scale, (*particleIterator).transform.rotate, (*particleIterator).transform.translate);
