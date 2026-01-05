@@ -2024,7 +2024,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
                     (*particleIterator).velocity += accelerationField.acceleration * kDeltaTime;
                 }
 
-                (*particleIterator).transform.translate += (*particleIterator).velocity * kDeltaTime;
+                
 
                 if (numInstance < kNumMaxInstance) {
                     Matrix4x4 worldMatrixpori = MakeAffineMatrix((*particleIterator).transform.scale, (*particleIterator).transform.rotate, (*particleIterator).transform.translate);
