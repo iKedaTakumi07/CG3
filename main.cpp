@@ -1824,12 +1824,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
             uint32_t start = (lat * kSubdivision + lon) * 6;
 
-            indexDatasphere[start + 0] = lb;
-            indexDatasphere[start + 1] = lt;
-            indexDatasphere[start + 2] = rb;
-            indexDatasphere[start + 3] = lt;
-            indexDatasphere[start + 4] = rt;
-            indexDatasphere[start + 5] = rb;
+            indexDatasphere[start + 5] = lb;
+            indexDatasphere[start + 4] = lt;
+            indexDatasphere[start + 3] = rb;
+            indexDatasphere[start + 2] = lt;
+            indexDatasphere[start + 1] = rt;
+            indexDatasphere[start + 0] = rb;
         }
     }
 
@@ -1856,7 +1856,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     materialDatasphere->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
     materialDatasphere->enableLighting = true;
     materialDatasphere->uvTransform = MakeIdentity4x4();
-    materialDatasphere->shininess = 10.0f;
+    materialDatasphere->shininess = 20.0f;
 
     // 平行光源
     Microsoft::WRL::ComPtr<ID3D12Resource> directionalLightMatrixResourcesphere = CreateBufferResource(device, sizeof(DirectionalLight));
