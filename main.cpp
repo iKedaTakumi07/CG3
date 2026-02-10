@@ -75,6 +75,7 @@ struct Material {
 struct TransformationMatrix {
     Matrix4x4 WVP;
     Matrix4x4 world;
+    Matrix4x4 worldInverseTranspose;
 };
 struct ParticleForGPU {
     Matrix4x4 WVP;
@@ -1272,7 +1273,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     inputElementDescs[2].SemanticIndex = 0;
     inputElementDescs[2].Format = DXGI_FORMAT_R32G32B32_FLOAT;
     inputElementDescs[2].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
-    
+
     /*inputElementDescs[3].SemanticName = "POSITION";
     inputElementDescs[3].SemanticIndex = 0;
     inputElementDescs[3].Format = DXGI_FORMAT_R32G32B32_FLOAT;
@@ -1842,6 +1843,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     // 単位行列を書き込む
     transformationMatrixDatasphere->WVP = MakeIdentity4x4();
     transformationMatrixDatasphere->world = MakeIdentity4x4();
+    transformationMatrixDatasphere->worldInverseTranspose = MakeIdentity4x4();
     // 動かす用のtransform
     Transform transformsphere { { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f } };
 
@@ -2160,9 +2162,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
             Matrix4x4 worldViewProjectionMatrixsphere = Multiply(worldMatrixsphere, Multiply(viewMatrix, projectionMatrixsphere));
             transformationMatrixDatasphere->WVP = worldViewProjectionMatrixsphere;
             transformationMatrixDatasphere->world = worldMatrixsphere;
+            transformationMatrixDatasphere->worldInverseTranspose = Inverse(worldMatrixsphere);
 
             directionalLightDatasphere->direction = Normalize(directionalLightDatasphere->direction);
-            
 
             // モデルデータ
 
@@ -2191,8 +2193,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
                 if (IsCollision(accelerationField.area, (*particleIterator).transform.translate)) {
                     (*particleIterator).velocity += accelerationField.acceleration * kDeltaTime;
                 }
-
-                
 
                 if (numInstance < kNumMaxInstance) {
                     Matrix4x4 worldMatrixpori = MakeAffineMatrix((*particleIterator).transform.scale, (*particleIterator).transform.rotate, (*particleIterator).transform.translate);
