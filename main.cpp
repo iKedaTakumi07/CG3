@@ -51,6 +51,10 @@ struct Vector4 {
 struct Matrix4x4 {
     float m[4][4];
 };
+struct AABB {
+    Vector3 min;
+    Vector3 max;
+};
 struct Transform {
     Vector3 scale;
     Vector3 rotate;
@@ -100,6 +104,10 @@ struct D3DResourceLeakChecker {
             debug->ReportLiveObjects(DXGI_DEBUG_D3D12, DXGI_DEBUG_RLO_ALL);
         }
     }
+};
+struct AccelerationField {
+    Vector3 acceleration;
+    AABB area;
 };
 struct ChunkHeader {
     char id[4]; // チャンク毎のID
@@ -394,6 +402,16 @@ Matrix4x4 MakeOrthographicMatrix(float left, float top, float right, float botto
         (top + bottom) / (bottom - top),
         nearClip / (nearClip - farClip), 1 };
     return num;
+}
+
+bool IsCollision(const AABB& aabb, const Vector3& point)
+{
+    if ((aabb.min.x <= point.x && aabb.max.x >= point.x)
+        && (aabb.min.y <= point.y && aabb.max.y >= point.y)
+        && (aabb.min.z <= point.z && aabb.max.z >= point.z)) {
+        return true;
+    }
+    return false;
 }
 
 Vector3 operator*(const Vector3& m1, const float& m2) { return Multiply(m1, m2); }
@@ -2020,6 +2038,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         instancingData[index].color = Particles[index].color;
     }*/
 
+    AccelerationField accelerationField;
+    accelerationField.acceleration = { 15.0f, 0.0f, 0.0f };
+    accelerationField.area.min = { -1.0f, -1.0f, -1.0f };
+    accelerationField.area.max = { 1.0f, 1.0f, 1.0f };
+
     /// ============================================================================================================
     /// 音声データ
     /// ============================================================================================================
@@ -2164,6 +2187,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
                     particleIterator = Particles.erase(particleIterator);
                     continue;
                 }
+
+                if (IsCollision(accelerationField.area, (*particleIterator).transform.translate)) {
+                    (*particleIterator).velocity += accelerationField.acceleration * kDeltaTime;
+                }
+
+                
 
                 if (numInstance < kNumMaxInstance) {
                     Matrix4x4 worldMatrixpori = MakeAffineMatrix((*particleIterator).transform.scale, (*particleIterator).transform.rotate, (*particleIterator).transform.translate);
