@@ -639,7 +639,9 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
                 Vector3 normal = normals[elementIndeices[2] - 1];
 
                 // 位置の反転&法線の反転&左下原点
+                position.x *= -1.0f;
                 texcoord.y = 1.0f - texcoord.y;
+                normal.x *= -1.0f;
 
                 triangle[faceVertex] = { position, texcoord, normal };
             }
@@ -1887,10 +1889,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     /// ==============================================================================================================
 
     // モデル読み込み
-    ModelData model = LoadObjFile("resources", "plane.obj");
+    ModelData model = LoadObjFile("resources", "terrain.obj");
 
     // 画像読み込み
-    DirectX::ScratchImage mip2 = LoadTexture("resources/circle.png");
+    DirectX::ScratchImage mip2 = LoadTexture("resources/grass.png");
     const DirectX::TexMetadata& metadata3 = mip2.GetMetadata();
     Microsoft::WRL::ComPtr<ID3D12Resource> textureResource3 = CreateTextureResource(device, metadata3);
     Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource3 = UploadTextureData(textureResource3, mip2, device, commandList.Get());
@@ -1942,7 +1944,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     // 今回は白を書き込んでみる
     materialDataModel->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
 
-    materialDataModel->enableLighting = true;
+    materialDataModel->enableLighting = false;
 
     materialDataModel->uvTransform = MakeIdentity4x4();
 
@@ -2288,7 +2290,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
             commandList->IASetIndexBuffer(&indexBufferViewModel);
 
-            /*commandList->DrawInstanced(UINT(model.vertices.size()), 1, 0, 0);*/
+            commandList->DrawInstanced(UINT(model.vertices.size()), 1, 0, 0);
 
             // 板ポリ
             commandList->SetGraphicsRootSignature(ParticlerootSignature.Get());
