@@ -2,12 +2,11 @@
 
 struct Material
 {
-    float32_t4 coler;
+    float32_t4 color;
     int32_t enableLighting;
     float32_t4x4 uvTransform;
     float32_t shininess;
 };
-
 struct DirectionalLight
 {
     float32_t4 color;
@@ -18,19 +17,24 @@ struct Camera
 {
     float32_t3 worldPosition;
 };
-
+struct PointLight
+{
+    float32_t4 color;
+    float32_t3 position;
+    float intensity;
+};
 
 ConstantBuffer<Material> gMaterial : register(b0);
 Texture2D<float32_t4> gTexture : register(t0);
 SamplerState gSampler : register(s0);
 ConstantBuffer<DirectionalLight> gDirectionalLight : register(b1);
 ConstantBuffer<Camera> gCamera : register(b2);
+ConstantBuffer<PointLight> gPointLigth : register(b3);
 
 
 struct PixelShaderOutput
 {
     float32_t4 color : SV_TARGET0;
-   
 };
 
 PixelShaderOutput main(VertexShaderOutput input)
@@ -39,18 +43,6 @@ PixelShaderOutput main(VertexShaderOutput input)
     float4 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
     float32_t4 textureColor = gTexture.Sample(gSampler, transformedUV.xy);
     
-    float32_t3 reflectLight = reflect(gDirectionalLight.direction, normalize(input.normal));
-    float32_t3 toEye = normalize(gCamera.worldPosition - input.worldPosition);
-    float32_t3 halfVector = normalize(-gDirectionalLight.direction + toEye);
-    
-    //float RdotE = dot(reflectLight, toEye);
-    //float specularPow = pow(saturate(RdotE), gMaterial.shininess);
-    
-    // blinn-phong
-    float NDotH = dot(normalize(input.normal), halfVector);
-    float specularPow = pow(saturate(NDotH), gMaterial.shininess);
-    
-    
     if (textureColor.a == 0.0)
     {
         discard;
@@ -58,14 +50,39 @@ PixelShaderOutput main(VertexShaderOutput input)
     
     if (gMaterial.enableLighting != 0)
     {
-         // half lambert
+        // =================
+        // DirectionalLight
+        // =================
+        
+        float32_t3 reflectLight = reflect(gDirectionalLight.direction, normalize(input.normal));
+        float32_t3 toEye = normalize(gCamera.worldPosition - input.worldPosition);
+        float32_t3 halfVector = normalize(-gDirectionalLight.direction + toEye);
+    
+    //float RdotE = dot(reflectLight, toEye);
+    //float specularPow = pow(saturate(RdotE), gMaterial.shininess);
+    
+    // blinn-phong
+        float NDotH = dot(normalize(input.normal), halfVector);
+        float specularPow = pow(saturate(NDotH), gMaterial.shininess);
+        
+        // half lambert
         float NdotL = dot(normalize(input.normal), -gDirectionalLight.direction);
         float cos = pow(NdotL * 0.5f + 0.5f, 2.0f);
         
-        float32_t3 diffuse = gMaterial.coler.rgb * textureColor.rgb * gDirectionalLight.color.rgb * cos * gDirectionalLight.intensity;
+        float32_t3 diffuse = gMaterial.color.rgb * textureColor.rgb * gDirectionalLight.color.rgb * cos * gDirectionalLight.intensity;
         float32_t3 specular = gDirectionalLight.color.rgb * gDirectionalLight.intensity * specularPow * float32_t3(1.0f, 1.0f, 1.0f);
-        output.color.rgb = diffuse + specular;
-        output.color.a = gMaterial.coler.a * textureColor.a;
+        
+        // =================
+        // PointLight
+        // =================
+        
+        float32_t3 posintLightDirection = normalize(input.worldPosition - gPointLigth.position);
+        float32_t3 diffusePoint = gMaterial.color.rgb * textureColor.rgb * gPointLigth.color.rgb * cos * gPointLigth.intensity;
+        float32_t3 specularPoint = gPointLigth.color.rgb * gPointLigth.intensity * specularPow * float32_t3(1.0f, 1.0f, 1.0f);
+        
+        
+        output.color.rgb = diffuse + specular + diffusePoint + specularPoint;
+        output.color.a = gMaterial.color.a * textureColor.a;
     
         if (output.color.a == 0.0)
         {
@@ -75,7 +92,7 @@ PixelShaderOutput main(VertexShaderOutput input)
     }
     else
     {
-        output.color = gMaterial.coler * textureColor;
+        output.color = gMaterial.color * textureColor;
         if (output.color.a == 0.0)
         {
             discard;

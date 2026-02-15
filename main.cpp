@@ -94,6 +94,12 @@ struct ModelData {
     std::vector<VertexData> vertices;
     MaterialData material;
 };
+struct PointLight {
+    Vector4 color;
+    Vector3 position;
+    float intensity;
+};
+
 struct D3DResourceLeakChecker {
     ~D3DResourceLeakChecker()
     {
@@ -1201,7 +1207,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     descriptorRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
     // RootParameter作成
-    D3D12_ROOT_PARAMETER rootParameters[5] = {};
+    D3D12_ROOT_PARAMETER rootParameters[6] = {};
     rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
     rootParameters[0].Descriptor.ShaderRegister = 0;
@@ -1222,6 +1228,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     rootParameters[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     rootParameters[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
     rootParameters[4].Descriptor.ShaderRegister = 2;
+
+    rootParameters[5].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    rootParameters[5].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    rootParameters[5].Descriptor.ShaderRegister = 3;
 
     D3D12_DESCRIPTOR_RANGE descriptorRangeForInstancing[1] = {};
     descriptorRangeForInstancing[0].BaseShaderRegister = 0;
@@ -1264,6 +1274,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     inputElementDescs[0].SemanticIndex = 0;
     inputElementDescs[0].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
     inputElementDescs[0].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
+
     inputElementDescs[1].SemanticName = "TEXCOORD";
     inputElementDescs[1].SemanticIndex = 0;
     inputElementDescs[1].Format = DXGI_FORMAT_R32G32_FLOAT;
@@ -1273,11 +1284,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     inputElementDescs[2].SemanticIndex = 0;
     inputElementDescs[2].Format = DXGI_FORMAT_R32G32B32_FLOAT;
     inputElementDescs[2].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
-
-    /*inputElementDescs[3].SemanticName = "POSITION";
-    inputElementDescs[3].SemanticIndex = 0;
-    inputElementDescs[3].Format = DXGI_FORMAT_R32G32B32_FLOAT;
-    inputElementDescs[3].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;*/
 
     D3D12_INPUT_LAYOUT_DESC inputLayoutDesc {};
     inputLayoutDesc.pInputElementDescs = inputElementDescs;
@@ -1861,23 +1867,33 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     materialDatasphere->shininess = 20.0f;
 
     // 平行光源
-    Microsoft::WRL::ComPtr<ID3D12Resource> directionalLightMatrixResourcesphere = CreateBufferResource(device, sizeof(DirectionalLight));
+    Microsoft::WRL::ComPtr<ID3D12Resource> directionalLightMatrixResourceSphere = CreateBufferResource(device, sizeof(DirectionalLight));
     // データを書き込み
     DirectionalLight* directionalLightDatasphere = nullptr;
     // アドレスを取得
-    directionalLightMatrixResourcesphere->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightDatasphere));
+    directionalLightMatrixResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightDatasphere));
     // 書き込み
     directionalLightDatasphere->color = { 1.0f, 1.0f, 1.0f, 1.0f };
     directionalLightDatasphere->direction = { 0.0f, -1.0f, 0.0f };
-    directionalLightDatasphere->intensity = 1.0f;
+    directionalLightDatasphere->intensity = 0.0f;
 
     // sphere用のマテリアルリソースを作る
-    Microsoft::WRL::ComPtr<ID3D12Resource> CameraDataResourcesphere = CreateBufferResource(device, sizeof(CameraForGPU));
+    Microsoft::WRL::ComPtr<ID3D12Resource> CameraDataResourceSphere = CreateBufferResource(device, sizeof(CameraForGPU));
     CameraForGPU* CameraForGPUDatasphere = nullptr;
     // mapして書き込み
-    CameraDataResourcesphere->Map(0, nullptr, reinterpret_cast<void**>(&CameraForGPUDatasphere));
+    CameraDataResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&CameraForGPUDatasphere));
     // 今回は白を書き込んでみる
     CameraForGPUDatasphere->worldPosition = cameratransform.translate;
+
+    // PointLight
+    Microsoft::WRL::ComPtr<ID3D12Resource> PointLightResourceSphere = CreateBufferResource(device, sizeof(PointLight));
+    PointLight* PointLightDatasphere = nullptr;
+    // mapして書き込み
+    PointLightResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&PointLightDatasphere));
+    // 今回は白を書き込んでみる
+    PointLightDatasphere->color = { 1.0f, 1.0f, 1.0f, 1.0f };
+    PointLightDatasphere->position = Vector3(0.0f, 2.0f, 0.0f);
+    PointLightDatasphere->intensity = 1.0f;
 
     // 切り替えフラグ
     bool useMonsterBall = true;
@@ -1968,6 +1984,24 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     directionalLightDataModel->color = { 1.0f, 1.0f, 1.0f, 1.0f };
     directionalLightDataModel->direction = { 0.0f, -1.0f, 0.0f };
     directionalLightDataModel->intensity = 1.0f;
+
+    // sphere用のマテリアルリソースを作る
+    Microsoft::WRL::ComPtr<ID3D12Resource> CameraDataResourceModel = CreateBufferResource(device, sizeof(CameraForGPU));
+    CameraForGPU* CameraForGPUDataModel = nullptr;
+    // mapして書き込み
+    CameraDataResourceModel->Map(0, nullptr, reinterpret_cast<void**>(&CameraForGPUDataModel));
+    // 今回は白を書き込んでみる
+    CameraForGPUDataModel->worldPosition = cameratransform.translate;
+
+    // PointLight
+    Microsoft::WRL::ComPtr<ID3D12Resource> PointLightResourceModel = CreateBufferResource(device, sizeof(PointLight));
+    PointLight* PointLightDataModel = nullptr;
+    // mapして書き込み
+    PointLightResourceModel->Map(0, nullptr, reinterpret_cast<void**>(&PointLightDataModel));
+    // 今回は白を書き込んでみる
+    PointLightDataModel->color = { 1.0f, 1.0f, 1.0f, 1.0f };
+    PointLightDataModel->position = Vector3(0.0f, 10.0f, 0.0f);
+    PointLightDataModel->intensity = 1.0f;
 
     // ===================================================================
     // いたポリ
@@ -2130,6 +2164,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
                 ImGui::SliderFloat3("direction##ModelLight", &directionalLightDataModel->direction.x, -1.0f, 1.0f);
                 ImGui::DragFloat("intensity##ModelLight", &directionalLightDataModel->intensity, 0.01f);
                 ImGui::ColorEdit4("Color##ModelLight", &(directionalLightDataModel->color).x);
+                ImGui::ColorEdit3("Color##ModelLight", &(directionalLightDataModel->color).x);
             }
 
             ImGui::DragFloat3("cameratransform##", &cameratransform.translate.x, 0.01f);
@@ -2145,7 +2180,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
             ImGui::SliderFloat3("direction##SphereLight", &directionalLightDatasphere->direction.x, -1.0f, 1.0f);
             ImGui::DragFloat("intensity##SphereLight", &directionalLightDatasphere->intensity, 0.01f);
             ImGui::SliderFloat4("Color##SphereLight", &directionalLightDatasphere->color.x, -20.0f, 20.0f);
-            ImGui::ColorEdit4("Color##SphereLight", &(directionalLightDatasphere->color).x);
+            ImGui::DragFloat3("Position##PointLight", &PointLightDatasphere->position.x, 0.01f);
             ImGui::End();
 
             // update/更新処理
@@ -2270,11 +2305,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
             // transformationMatrixCBufferの場所を設置
             commandList->SetGraphicsRootConstantBufferView(0, materialResourcesphere->GetGPUVirtualAddress());
             commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourcesphere->GetGPUVirtualAddress());
-            commandList->SetGraphicsRootConstantBufferView(3, directionalLightMatrixResourcesphere->GetGPUVirtualAddress());
-            commandList->SetGraphicsRootConstantBufferView(4, CameraDataResourcesphere->GetGPUVirtualAddress());
+            commandList->SetGraphicsRootConstantBufferView(3, directionalLightMatrixResourceSphere->GetGPUVirtualAddress());
+            //commandList->SetGraphicsRootConstantBufferView(4, CameraDataResourceSphere->GetGPUVirtualAddress());
+            //commandList->SetGraphicsRootConstantBufferView(5, PointLightResourceSphere->GetGPUVirtualAddress());
             commandList->IASetIndexBuffer(&indexBufferViewsphere);
 
-            commandList->DrawIndexedInstanced(spherindexNum, 1, 0, 0, 0);
+            //commandList->DrawIndexedInstanced(spherindexNum, 1, 0, 0, 0);
 
             //
             // モデルデータ
@@ -2285,20 +2321,21 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
             commandList->SetGraphicsRootConstantBufferView(0, materialResourceModel->GetGPUVirtualAddress());
             commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceModel->GetGPUVirtualAddress());
             commandList->SetGraphicsRootConstantBufferView(3, directionalLightMatrixResourceModel->GetGPUVirtualAddress());
-
+            //commandList->SetGraphicsRootConstantBufferView(4, CameraDataResourceModel->GetGPUVirtualAddress());
+            //commandList->SetGraphicsRootConstantBufferView(5, PointLightResourceModel->GetGPUVirtualAddress());
             commandList->IASetIndexBuffer(&indexBufferViewModel);
 
-            /*commandList->DrawInstanced(UINT(model.vertices.size()), 1, 0, 0);*/
+            commandList->DrawInstanced(UINT(model.vertices.size()), 1, 0, 0);
 
             // 板ポリ
-            commandList->SetGraphicsRootSignature(ParticlerootSignature.Get());
-            commandList->SetPipelineState(ParticlegraphicsPipelineState.Get());
-            commandList->IASetVertexBuffers(0, 1, &instancingvertexBufferView);
+            // commandList->SetGraphicsRootSignature(ParticlerootSignature.Get());
+            // commandList->SetPipelineState(ParticlegraphicsPipelineState.Get());
+            // commandList->IASetVertexBuffers(0, 1, &instancingvertexBufferView);
 
-            // 描画
-            commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
-            commandList->SetGraphicsRootDescriptorTable(1, instancingSrvHandleGPU6);
-            commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU3);
+            //// 描画
+            // commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
+            // commandList->SetGraphicsRootDescriptorTable(1, instancingSrvHandleGPU6);
+            // commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU3);
             /*if (numInstance > 0) {
                 commandList->DrawInstanced(UINT(model.vertices.size()), numInstance, 0, 0);
             }*/
