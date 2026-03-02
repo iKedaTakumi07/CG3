@@ -1943,10 +1943,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     materialResourceModel->Map(0, nullptr, reinterpret_cast<void**>(&materialDataModel));
     // 今回は白を書き込んでみる
     materialDataModel->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
-
-    materialDataModel->enableLighting = false;
-
+    materialDataModel->enableLighting = true;
     materialDataModel->uvTransform = MakeIdentity4x4();
+    materialDataModel->shininess = 20.0f;
 
     // sphere用のtransformmatrix用のリソースを作る
     Microsoft::WRL::ComPtr<ID3D12Resource> transformationMatrixResourceModel = CreateBufferResource(device, sizeof(TransformationMatrix));
@@ -1957,6 +1956,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     // 単位行列を書き込む
     transformationMatrixDataModel->WVP = MakeIdentity4x4();
     transformationMatrixDataModel->world = MakeIdentity4x4();
+    transformationMatrixDataModel->worldInverseTranspose = MakeIdentity4x4();
 
     Transform transformModel { { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f } };
 
@@ -1968,8 +1968,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     directionalLightMatrixResourceModel->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightDataModel));
     // 書き込み
     directionalLightDataModel->color = { 1.0f, 1.0f, 1.0f, 1.0f };
-    directionalLightDataModel->direction = { 0.0f, -1.0f, 0.0f };
+    directionalLightDataModel->direction = { 0.0f, 0.0f, -1.0f };
     directionalLightDataModel->intensity = 1.0f;
+
+    // sphere用のマテリアルリソースを作る
+    Microsoft::WRL::ComPtr<ID3D12Resource> CameraDataResourceModel = CreateBufferResource(device, sizeof(CameraForGPU));
+    CameraForGPU* CameraForGPUDataModel = nullptr;
+    // mapして書き込み
+    CameraDataResourceModel->Map(0, nullptr, reinterpret_cast<void**>(&CameraForGPUDataModel));
+    // 今回は白を書き込んでみる
+    CameraForGPUDataModel->worldPosition = cameratransform.translate;
 
     // ===================================================================
     // いたポリ
@@ -2287,6 +2295,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
             commandList->SetGraphicsRootConstantBufferView(0, materialResourceModel->GetGPUVirtualAddress());
             commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceModel->GetGPUVirtualAddress());
             commandList->SetGraphicsRootConstantBufferView(3, directionalLightMatrixResourceModel->GetGPUVirtualAddress());
+            commandList->SetGraphicsRootConstantBufferView(4, CameraDataResourceModel->GetGPUVirtualAddress());
 
             commandList->IASetIndexBuffer(&indexBufferViewModel);
 

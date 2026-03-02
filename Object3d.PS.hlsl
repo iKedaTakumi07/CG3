@@ -2,7 +2,7 @@
 
 struct Material
 {
-    float32_t4 coler;
+    float32_t4 color;
     int32_t enableLighting;
     float32_t4x4 uvTransform;
     float32_t shininess;
@@ -30,58 +30,53 @@ ConstantBuffer<Camera> gCamera : register(b2);
 struct PixelShaderOutput
 {
     float32_t4 color : SV_TARGET0;
-   
 };
 
 PixelShaderOutput main(VertexShaderOutput input)
 {
     PixelShaderOutput output;
+    
+    // UV
     float4 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
     float32_t4 textureColor = gTexture.Sample(gSampler, transformedUV.xy);
-    
-    float32_t3 reflectLight = reflect(gDirectionalLight.direction, normalize(input.normal));
-    float32_t3 toEye = normalize(gCamera.worldPosition - input.worldPosition);
-    float32_t3 halfVector = normalize(-gDirectionalLight.direction + toEye);
-    
-    //float RdotE = dot(reflectLight, toEye);
-    //float specularPow = pow(saturate(RdotE), gMaterial.shininess);
-    
-    // blinn-phong
-    float NDotH = dot(normalize(input.normal), halfVector);
-    float specularPow = pow(saturate(NDotH), gMaterial.shininess);
-    
-    
+
+    // 早期リターン
     if (textureColor.a == 0.0)
     {
         discard;
     }
     
-    if (gMaterial.enableLighting != 0)
+  if (gMaterial.enableLighting != 0)
     {
-         // half lambert
-        float NdotL = dot(normalize(input.normal), -gDirectionalLight.direction);
-        float cos = pow(NdotL * 0.5f + 0.5f, 2.0f);
+        // 正規化：補間されたベクトルの再正規化は必須
+        float32_t3 N = normalize(input.normal);
+        float32_t3 L = normalize(gDirectionalLight.direction); // 光源方向
+        float32_t3 V = normalize(gCamera.worldPosition - input.worldPosition); // 視線方向
         
-        float32_t3 diffuse = gMaterial.coler.rgb * textureColor.rgb * gDirectionalLight.color.rgb * cos * gDirectionalLight.intensity;
-        float32_t3 specular = gDirectionalLight.color.rgb * gDirectionalLight.intensity * specularPow * float32_t3(1.0f, 1.0f, 1.0f);
+        // Blinn-Phong: Half-Vector
+        float32_t3 H = normalize(-L + V);
+        
+        // Specular
+        float dotNH = dot(N, H);
+        float specularPow = pow(saturate(dotNH), gMaterial.shininess);
+        
+        // Half-Lambert Diffuse
+        float dotNL = dot(N, -L);
+        float halfLambert = pow(dotNL * 0.5f + 0.5f, 2.0f);
+        
+        float32_t3 diffuse = gMaterial.color.rgb * textureColor.rgb * gDirectionalLight.color.rgb * halfLambert * gDirectionalLight.intensity;
+        float32_t3 specular = gDirectionalLight.color.rgb * gDirectionalLight.intensity * specularPow;
+        
         output.color.rgb = diffuse + specular;
-        output.color.a = gMaterial.coler.a * textureColor.a;
-    
-        if (output.color.a == 0.0)
-        {
-            discard;
-        }
-        
+        output.color.a = gMaterial.color.a * textureColor.a;
     }
     else
     {
-        output.color = gMaterial.coler * textureColor;
-        if (output.color.a == 0.0)
-        {
-            discard;
-        }
+        output.color = gMaterial.color * textureColor;
     }
 
+    // 最終的なαチェック
+    if (output.color.a <= 0.0f) { discard; }
     
     return output;
 }
