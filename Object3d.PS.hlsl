@@ -18,6 +18,14 @@ struct Camera
 {
     float32_t3 worldPosition;
 };
+struct PointLight
+{
+    float32_t4 color; // 色
+    float32_t3 position; // 位置
+    float intensity; // 輝度
+    float radius; // ライトの届く最大距離
+    float decay; // 減衰率
+};
 
 
 ConstantBuffer<Material> gMaterial : register(b0);
@@ -25,6 +33,7 @@ Texture2D<float32_t4> gTexture : register(t0);
 SamplerState gSampler : register(s0);
 ConstantBuffer<DirectionalLight> gDirectionalLight : register(b1);
 ConstantBuffer<Camera> gCamera : register(b2);
+ConstantBuffer<PointLight> gPointLight : register(b3);
 
 
 struct PixelShaderOutput
@@ -46,28 +55,54 @@ PixelShaderOutput main(VertexShaderOutput input)
         discard;
     }
     
-  if (gMaterial.enableLighting != 0)
+    if (gMaterial.enableLighting != 0)
     {
-        // 正規化：補間されたベクトルの再正規化は必須
-        float32_t3 N = normalize(input.normal);
-        float32_t3 L = normalize(gDirectionalLight.direction); // 光源方向
-        float32_t3 V = normalize(gCamera.worldPosition - input.worldPosition); // 視線方向
+        // ============================
+        // DirectionalLight
+        // ===========================
         
-        // Blinn-Phong: Half-Vector
-        float32_t3 H = normalize(-L + V);
+        // half lambert
+        float NdotL = dot(normalize(input.normal), -gDirectionalLight.direction);
+        float cos = pow(NdotL * 0.5f + 0.5f, 2.0f);
+    
+        // 拡散反射
+        float32_t3 DirectionalLight_diffuse = gMaterial.color.rgb * textureColor.rgb * gDirectionalLight.color.rgb * cos * gDirectionalLight.intensity;
         
-        // Specular
-        float dotNH = dot(N, H);
-        float specularPow = pow(saturate(dotNH), gMaterial.shininess);
+        // PixelShaderでCameraへの方向を算出
+        float32_t3 toEye = normalize(gCamera.worldPosition - input.worldPosition);
         
-        // Half-Lambert Diffuse
-        float dotNL = dot(N, -L);
-        float halfLambert = pow(dotNL * 0.5f + 0.5f, 2.0f);
+        // blinn-phong
+        float32_t3 halfVector = normalize(-gDirectionalLight.direction + toEye);
+        float NDotH = dot(normalize(input.normal), halfVector);
+        float specularPow = pow(saturate(NDotH), gMaterial.shininess);
+
+        // 鏡面反射
+        float32_t3 DirectionalLight_specular = gDirectionalLight.color.rgb * gDirectionalLight.intensity * specularPow * float32_t3(1.0f, 1.0f, 1.0f);
+     
         
-        float32_t3 diffuse = gMaterial.color.rgb * textureColor.rgb * gDirectionalLight.color.rgb * halfLambert * gDirectionalLight.intensity;
-        float32_t3 specular = gDirectionalLight.color.rgb * gDirectionalLight.intensity * specularPow;
+        // =======================
+        // pointLight
+        // =======================
         
-        output.color.rgb = diffuse + specular;
+        // 入射光 
+        float32_t3 pointLightDirection = normalize(gPointLight.position - input.worldPosition);
+        // ポイントライトへの距離
+        float32_t distance = length(gPointLight.position - input.worldPosition);
+        // 逆二乗則による減衰係数
+        float32_t factor = pow(saturate(-distance / gPointLight.radius + 1.0), gPointLight.decay);
+        
+        float NdotL_pt = saturate(dot(input.normal, pointLightDirection));
+        float32_t3 ptDiffuse = gMaterial.color.rgb * textureColor.rgb * gPointLight.color.rgb * gPointLight.intensity * factor * NdotL_pt;
+
+        // --- 鏡面反射 (Blinn-Phong) ---
+        float32_t3 halfVector_pt = normalize(pointLightDirection + toEye);
+        float NDotH_pt = saturate(dot(input.normal, halfVector_pt));
+        float specularPow_pt = pow(NDotH_pt, gMaterial.shininess);
+        float32_t3 ptSpecular = gPointLight.color.rgb * gPointLight.intensity * factor * specularPow_pt;
+     
+        // 拡散反射 + 鏡面反射
+        output.color.rgb = DirectionalLight_diffuse + ptDiffuse + DirectionalLight_specular + ptSpecular;
+        // αはいつも通り
         output.color.a = gMaterial.color.a * textureColor.a;
     }
     else
@@ -76,7 +111,10 @@ PixelShaderOutput main(VertexShaderOutput input)
     }
 
     // 最終的なαチェック
-    if (output.color.a <= 0.0f) { discard; }
+    if (output.color.a <= 0.0f)
+    {
+        discard;
+    }
     
     return output;
 }
