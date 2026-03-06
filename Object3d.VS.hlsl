@@ -7,10 +7,7 @@ struct TransformationMatrix
     float32_t4x4 worldInverseTranspose;
 };
 
-
 ConstantBuffer<TransformationMatrix> gTransformationMatrix : register(b0);
-
-
 
 struct VertexShaderInput
 {
@@ -23,9 +20,12 @@ struct VertexShaderInput
 VertexShaderOutput main(VertexShaderInput input)
 {
     VertexShaderOutput output;
+    // WVP
     output.position = mul(input.position, gTransformationMatrix.WVP);
     output.texcoord = input.texcoord;
+    
     output.normal = normalize(mul(input.normal, (float32_t3x3) gTransformationMatrix.worldInverseTranspose));
+    
     output.worldPosition = mul(input.position, gTransformationMatrix.World).xyz;
    
     
