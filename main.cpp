@@ -162,6 +162,17 @@ struct Emitter {
 struct CameraForGPU {
     Vector3 worldPosition;
 };
+struct SpotLigth {
+    Vector4 color;
+    Vector3 position;
+    float intensity;
+    Vector3 direction;
+    float distance;
+    float decay;
+    float cosAngle;
+    float cosFalloffStart; // スポットライトの内側の角度（減衰開始の余弦）
+    float padding[2];
+};
 
 Particle MakeNewParticle(std::mt19937& randomEngine, const Vector3& translate)
 {
@@ -1211,7 +1222,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     descriptorRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
     // RootParameter作成
-    D3D12_ROOT_PARAMETER rootParameters[6] = {};
+    D3D12_ROOT_PARAMETER rootParameters[7] = {};
     rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
     rootParameters[0].Descriptor.ShaderRegister = 0;
@@ -1236,6 +1247,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     rootParameters[5].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     rootParameters[5].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
     rootParameters[5].Descriptor.ShaderRegister = 3;
+
+    rootParameters[6].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    rootParameters[6].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    rootParameters[6].Descriptor.ShaderRegister = 4;
 
     D3D12_DESCRIPTOR_RANGE descriptorRangeForInstancing[1] = {};
     descriptorRangeForInstancing[0].BaseShaderRegister = 0;
@@ -1992,17 +2007,32 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     // 今回は白を書き込んでみる
     CameraForGPUDataModel->worldPosition = cameratransform.translate;
 
-    // sphere用のマテリアルリソースを作る
-    Microsoft::WRL::ComPtr<ID3D12Resource> PointLigthModel = CreateBufferResource(device, sizeof(PointLigth));
-    PointLigth* PointLigthDataModel = nullptr;
+    // 共通ポイントライト
+    Microsoft::WRL::ComPtr<ID3D12Resource> pointLigth = CreateBufferResource(device, sizeof(PointLigth));
+    PointLigth* PointLigthData = nullptr;
     // mapして書き込み
-    PointLigthModel->Map(0, nullptr, reinterpret_cast<void**>(&PointLigthDataModel));
+    pointLigth->Map(0, nullptr, reinterpret_cast<void**>(&PointLigthData));
     // 今回は白を書き込んでみる
-    PointLigthDataModel->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
-    PointLigthDataModel->position = Vector3(0.0f, 2.0f, 0.0f);
-    PointLigthDataModel->intensity = 1.0f;
-    PointLigthDataModel->decay = 0.1f;
-    PointLigthDataModel->radius = 10.0f;
+    PointLigthData->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+    PointLigthData->position = Vector3(0.0f, 2.0f, 0.0f);
+    PointLigthData->intensity = 1.0f;
+    PointLigthData->decay = 0.1f;
+    PointLigthData->radius = 10.0f;
+
+    // 共通スポットライト
+    Microsoft::WRL::ComPtr<ID3D12Resource> spotLigth = CreateBufferResource(device, sizeof(SpotLigth));
+    SpotLigth* SpotLigthData = nullptr;
+    // mapして書き込み
+    spotLigth->Map(0, nullptr, reinterpret_cast<void**>(&SpotLigthData));
+    // 今回は白を書き込んでみる
+    SpotLigthData->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+    SpotLigthData->position = Vector3(0.0f, 2.0f, 0.0f);
+    SpotLigthData->distance = 7.0f;
+    SpotLigthData->direction = Normalize({ -1.0f, -1.0f, 0.0f });
+    SpotLigthData->intensity = 4.0f;
+    SpotLigthData->decay = 2.0f;
+    SpotLigthData->cosAngle = std::cos(std::numbers::pi_v<float> / 3.0f);
+    SpotLigthData->cosFalloffStart = std::cos(std::numbers::pi_v<float> / 4.0f);
 
     // ===================================================================
     // いたポリ
@@ -2165,16 +2195,29 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
                 ImGui::SliderFloat3("direction##ModelLight", &directionalLightDataModel->direction.x, -1.0f, 1.0f);
                 ImGui::DragFloat("intensity##ModelLight", &directionalLightDataModel->intensity, 0.01f);
                 ImGui::ColorEdit4("Color##ModelLight", &(directionalLightDataModel->color).x);
-             
             }
+            ImGui::End();
 
+            ImGui::Begin("Ligth");
             ImGui::DragFloat3("cameratransform##", &cameratransform.translate.x, 0.01f);
             ImGui::DragFloat3("camerarotate##", &cameratransform.rotate.x, 0.01f);
-            ImGui::DragFloat3("Position##PointLigth", &PointLigthDataModel->position.x, 0.01f);
-            ImGui::ColorEdit4("color##PointLigth", &(PointLigthDataModel->color).x);
-            ImGui::DragFloat("decay##PointLigth", &PointLigthDataModel->decay, 0.01f);
-            ImGui::DragFloat("radius##PointLigth", &PointLigthDataModel->radius, 0.01f);
-            ImGui::DragFloat("intensity##PointLigth", &PointLigthDataModel->intensity, 0.01f);
+            if (ImGui::CollapsingHeader("PointLigthData##PointLigth")) {
+                ImGui::DragFloat3("Position##PointLigth", &PointLigthData->position.x, 0.01f);
+                ImGui::ColorEdit4("color##PointLigth", &(PointLigthData->color).x);
+                ImGui::DragFloat("decay##PointLigth", &PointLigthData->decay, 0.01f);
+                ImGui::DragFloat("radius##PointLigth", &PointLigthData->radius, 0.01f);
+                ImGui::DragFloat("intensity##PointLigth", &PointLigthData->intensity, 0.01f);
+            }
+            if (ImGui::CollapsingHeader("SpotLigthData##SpotLigth")) {
+                ImGui::ColorEdit4("color##SpotLigth", &(SpotLigthData->color).x);
+                ImGui::DragFloat3("position##SpotLigth", &SpotLigthData->position.x, 0.01f);
+                ImGui::DragFloat("intensity##SpotLigth", &SpotLigthData->intensity, 0.01f);
+                ImGui::DragFloat3("direction##SpotLigth", &SpotLigthData->direction.x, 0.01f);
+                ImGui::DragFloat("distance##SpotLigth", &SpotLigthData->distance, 0.01f);
+                ImGui::DragFloat("decay##SpotLigth", &SpotLigthData->decay, 0.01f);
+                ImGui::DragFloat("cosAngle##SpotLigth", &SpotLigthData->cosAngle, 0.01f);
+                ImGui::DragFloat("cosFalloffStart##SpotLigth", &SpotLigthData->cosFalloffStart, 0.01f);
+            }
             ImGui::End();
 
             ImGui::Begin("sphere");
@@ -2313,7 +2356,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
             commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourcesphere->GetGPUVirtualAddress());
             commandList->SetGraphicsRootConstantBufferView(3, directionalLightMatrixResourcesphere->GetGPUVirtualAddress());
             commandList->SetGraphicsRootConstantBufferView(4, CameraDataResourcesphere->GetGPUVirtualAddress());
-            commandList->SetGraphicsRootConstantBufferView(5, PointLigthModel->GetGPUVirtualAddress());
+            commandList->SetGraphicsRootConstantBufferView(5, pointLigth->GetGPUVirtualAddress());
+            commandList->SetGraphicsRootConstantBufferView(6, spotLigth->GetGPUVirtualAddress());
             commandList->IASetIndexBuffer(&indexBufferViewsphere);
 
             commandList->DrawIndexedInstanced(spherindexNum, 1, 0, 0, 0);
@@ -2328,7 +2372,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
             commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceModel->GetGPUVirtualAddress());
             commandList->SetGraphicsRootConstantBufferView(3, directionalLightMatrixResourceModel->GetGPUVirtualAddress());
             commandList->SetGraphicsRootConstantBufferView(4, CameraDataResourceModel->GetGPUVirtualAddress());
-            commandList->SetGraphicsRootConstantBufferView(5, PointLigthModel->GetGPUVirtualAddress());
+            commandList->SetGraphicsRootConstantBufferView(5, pointLigth->GetGPUVirtualAddress());
 
             commandList->IASetIndexBuffer(&indexBufferViewModel);
 
